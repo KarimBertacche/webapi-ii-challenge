@@ -6,7 +6,7 @@ server.use(express.json());
 
 server.get('/api/posts', async (req, res) => {
     try {
-        const posts = await data.find(req.query);
+        const posts = await data.find();
         res.status(200).json(posts);
     } catch(error) {
         res.status(500).json({
@@ -55,18 +55,98 @@ server.get('/api/posts/:id/comments', async (req, res) => {
 server.post('/api/posts', async (req, res) => {
     try {
         const newPost = req.body;
-        const post = await data.insert(newPost);
 
-        if(post.title !== '' || post.contents !== '') {
-            res.status(201).json(post);
-        } else {
+        if(newPost.title === undefined || newPost.title === '') {
             res.status(400).json({
-                message: 'Title or content is missing'
+                message: 'Title is missing'
             });
+        } else if(newPost.contents === undefined || newPost.contents === '') {
+            res.status(400).json({
+                message: 'Content is missing'
+            });
+        } else {
+            const post = await data.insert(newPost);           
+            res.status(201).json(post);
         }
     } catch {
         res.status(500).json({
             errorMessage: 'Server error while creating the post'
+        });
+    }
+});
+
+server.post('/api/posts/:id/comments', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const post = await data.findById(id);
+
+        if(post.length === 0) {
+            res.status(404).json({
+                message: 'The post with the specified ID does not exist.'
+            })
+        } else {
+            const newComment = { ...req.body, post_id: id };
+            const comment = await data.insertComment(newComment);
+            if(comment.text === '' || comment.text === undefined) {
+                res.status(400).json({
+                    message: 'Text is missing'
+                });
+            } else {
+                res.status(201).json(comment);
+            }
+        }
+    } catch(error) {
+        res.status(500).json({
+            errorMessage: 'Server error while creating comment'
+        })
+    }
+});
+
+server.delete('/api/posts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deleted = await data.remove(id);
+        if(deleted > 0) {
+            res.status(204).end();
+        } else {
+            res.status(404).json({
+                message: 'Post not found'
+            });
+        }         
+    } catch(error) {
+        res.status(500).json({
+            errorMessage: 'Server error while deleting post'
+        })
+    }
+});
+
+server.put('/api/posts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const changes = req.body;
+
+        if (changes.contents === undefined || changes.contents === '') {
+            res.status(400).json({
+                message: 'Please provide contents for the post.'
+            });
+        } else if (changes.title === undefined || changes.title === '') {
+            res.status(400).json({
+                message: 'Please provide both title and contents for the post.'
+            });
+        } else {
+            const updatedPost = await data.update(id, changes);
+            if(updatedPost) {
+                res.status(200).json(updatedPost);
+            } else {
+                res.status(404).json({
+                    message: 'The post with the specified ID does not exist.'
+                });
+            }
+        }
+
+    } catch(error) {
+        res.status(500).json({
+            errorMessage: 'Server error while updating post'
         });
     }
 });
